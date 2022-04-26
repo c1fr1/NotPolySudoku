@@ -16,7 +16,7 @@ import org.joml.Vector3f
 import org.lwjgl.glfw.GLFW.*
 import solvers.*
 
-class MainView : EnigView() {
+object MainView : EnigView() {
 
 	lateinit var input : InputHandler
 
@@ -98,7 +98,7 @@ class MainView : EnigView() {
 			}
 		}
 		addButton("[T]ry Generation", GLFW_KEY_T) {
-			makeBoard(solver, gahGenerate)
+			makeBoard(solver, steadyGenerate)
 		}
 
 		/*addButton("Confirm Impossible [O]", GLFW_KEY_O) {
@@ -118,9 +118,7 @@ class MainView : EnigView() {
 
 		if (!Button.runningInstruction) checkInput()
 
-		//solver.mutex.lock()
 		drawBoard()
-		//solver.mutex.unlock()
 
  		if (!Button.runningInstruction) drawButtons()
 
@@ -128,7 +126,6 @@ class MainView : EnigView() {
 	}
 
 	fun drawButtons() {
-		//9 slots (to start with)
 
 		vao.prepareRender()
 		cshader.enable()
@@ -152,15 +149,6 @@ class MainView : EnigView() {
 		for (i in buttons.indices) {
 			renderButtonText(i + 1, buttons[i].name)
 		}
-
-		/*renderButtonText(1, "[S]olve Board")
-		renderButtonText(2, "Sub[G]roup Elim")
-		renderButtonText(3, "[C]heck Board")
-		renderButtonText(4, "[R]eset Board")
-		renderButtonText(5, "Save Board [P]")
-		renderButtonText(6, "[L]oad Board")
-		renderButtonText(7, "[U]pdate Trivial")
-		renderButtonText(8, "Random [E]ntry")*/
 	}
 
 	fun drawButtonBackground(i : Int, color : Vector3f? = null) {
@@ -228,8 +216,6 @@ class MainView : EnigView() {
 		}
 	}
 
-	var minImpossibilitySize = Int.MAX_VALUE
-
 	fun checkSelectionMovement() {
 		if (input.keys[GLFW_KEY_ESCAPE] == KeyState.Released) {
 			selectedX = -1
@@ -292,16 +278,29 @@ class MainView : EnigView() {
 	}
 
 	fun drawCells() {
+
+		val selectedNum = numberBuffer.toIntOrNull()
+
 		for (x in 0 until board.dim) for (y in 0 until board.dim) {
 			cshader[0, 0] = cam.getMatrix()
 				.translate(-1f + 2f * x / board.dim, 1 - 2f * (y + 1) / board.dim, 0f)
 				.scale(1.8f / (board.dim))
 				.translate(0.05f, 0.05f, 0f)
-			cshader[2, 0] = if ((x / board.n) % 2 +  y / board.n % 2 == 1) {
+
+			val color = if ((x / board.n) % 2 +  y / board.n % 2 == 1) {
 				Vector3f(0.2f, 0.2f, 0.2f)
 			} else {
 				Vector3f(0.4f, 0.4f, 0.4f)
 			}
+			if (selectedNum != null && selectedNum in 1..board.dim) {
+				if (board[x, y] == selectedNum) {
+					color.y += 0.2f
+				} else if (solver.cellChannelFor(x, y).options[selectedNum - 1]) {
+					color.x += 0.15f
+					color.y += 0.15f
+				}
+			}
+			cshader[2, 0] = color
 			vao.drawTriangles()
 		}
 	}

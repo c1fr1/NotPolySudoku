@@ -135,7 +135,9 @@ class ChannelSolver {
 	fun queueNegUpdate(cu : CellUpdate) = queueNegUpdate(cu.x, cu.y, cu.v)
 	fun queueNegUpdate(x : Int, y : Int, v : Int) : Boolean {
 		if (cellChannelFor(x, y).options[v - 1]) {
-			negUpdateQueue.add(CellUpdate(x, y, v))
+			if (!negUpdateQueue.contains(CellUpdate(x, y, v))) {
+				negUpdateQueue.add(CellUpdate(x, y, v))
+			}
 			return true
 		}
 		return false
@@ -145,6 +147,23 @@ class ChannelSolver {
 		return cellChannels[x + y * board.dim]
 	}
 	fun cellChannelFor(p : Pos) = cellChannelFor(p.x, p.y)
+
+	fun boxChannelFor(x : Int, y : Int, v : Int) : BoxChannel {
+		val bx = x / n
+		val by = y / n
+		return boxChannels[bx + n * by + board.dim * (v - 1)]
+	}
+	fun boxChannelFor(cu : CellUpdate) = boxChannelFor(cu.x, cu.y, cu.v)
+
+	fun colChannelFor(x : Int, v : Int) : ColChannel {
+		return colChannels[v - 1 + x * board.dim]
+	}
+	fun colChannelFor(cu : CellUpdate) = colChannelFor(cu.x, cu.v)
+
+	fun rowChannelFor(y : Int, v : Int) : RowChannel {
+		return rowChannels[v - 1 + y * board.dim]
+	}
+	fun rowChannelFor(cu : CellUpdate) = rowChannelFor(cu.y, cu.v)
 
 	fun copy() : ChannelSolver {
 		return ChannelSolver(this)

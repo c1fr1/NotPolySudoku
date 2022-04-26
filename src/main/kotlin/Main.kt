@@ -6,8 +6,8 @@ fun main(args : Array<String>) {
 	EnigContext.init()
 	val window = EnigWindow(1500, 1000, "Poly Sudoku Solver", GLContextPreset.standard2D)
 
-	val view = MainView()
-	view.runInGLSafe(window)
+	//val view = MainView()
+	MainView.runInGLSafe(window)
 
 	EnigContext.terminate()
 }
