@@ -8,6 +8,13 @@ class CellUpdate(xp : Int, yp : Int, val v : Int) : Pos(xp, yp) {
 			other.x == x && other.y == y && other.v == v
 		} else false
 	}
+	fun copy() : CellUpdate {
+		return CellUpdate(x, y, v)
+	}
+
+	override fun toString() : String {
+		return "($x, $y) : $v"
+	}
 }
 
 interface Channel {

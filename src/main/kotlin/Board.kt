@@ -77,6 +77,10 @@ class Board {
 		return true
 	}
 
+	fun checkComplete() : Boolean {
+		return data.all { r -> r.all { it != 0 } }
+	}
+
 	fun copy() : Board {
 		val ret = Board(n)
 		for (x in data.indices) for (y in data.indices) {

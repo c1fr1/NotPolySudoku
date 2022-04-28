@@ -7,12 +7,16 @@ import org.joml.Vector3f
 import org.lwjgl.glfw.GLFW
 import kotlin.concurrent.thread
 
-class Button(var name : String, var key : Int, var performAction : () -> Unit) {
-	operator fun invoke() = thread {
-		if (runningInstruction) return@thread
-		runningInstruction = true
-		performAction()
-		runningInstruction = false
+class Button(var name : String, var key : Int, var spawnThread : Boolean = true, var performAction : () -> Unit) {
+	operator fun invoke() {
+		if (spawnThread) thread {
+			if (runningInstruction) return@thread
+			runningInstruction = true
+			performAction()
+			runningInstruction = false
+		} else {
+			performAction()
+		}
 	}
 	operator fun invoke(input : InputHandler, cam : Camera, i : Int) {
 		if (input.keys[key] == KeyState.Released || touching(input, cam, i)) this()

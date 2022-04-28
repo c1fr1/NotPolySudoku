@@ -81,14 +81,14 @@ val gahGenerate : BoardGenerator = { s ->
 fun steadyGenerateRecursive(s : ChannelSolver, cu : CellUpdate) : ArrayList<CellUpdate>? {
 	val c = s.copy()
 	c.update(cu)
-	MainView.solver = c
-	MainView.board = c.board
 	mehSolve(c)
 	if (c.board.checkCompleteCorrect()) {
 		return arrayListOf()
 	} else if (c.impossibleState()) {
 		return null
 	}
+
+	MainView.solver = c
 
 	val cc = c.cellChannels.filter { !it.filled }.random()
 	val possibleUpdates = cc.options.indices.filter { cc.options[it] }.map { CellUpdate(cc.x, cc.y, it + 1) } as ArrayList
@@ -122,7 +122,54 @@ val steadyGenerate : BoardGenerator = { s ->
 		}
 	}
 	MainView.solver = s
-	MainView.board = s.board
 
 	hints
+}
+
+val reverseGreedyGenerate : BoardGenerator = { s ->
+	mehSolve(s)
+
+	var possibleUpdates = s.possibleUpdates()
+
+	while (possibleUpdates.isNotEmpty()) {
+		val cu = possibleUpdates.minByOrNull { s.cellChannelFor(it).freedom } ?: break
+		s.update(cu)
+		mehSolve(s)
+		possibleUpdates = s.possibleUpdates()
+	}
+
+
+	if (!s.board.checkCompleteCorrect()) arrayListOf() else {
+
+		val rs = s.copy()
+		s.reset()
+
+		val ret = ArrayList<CellUpdate>()
+		while (!s.board.checkCompleteCorrect()) {
+			val c = s.cellChannels.filter { !it.filled }.random()
+			val cu = CellUpdate(c.x, c.y, rs.board[c.x, c.y])
+			s.update(cu)
+			ret.add(cu)
+		}
+
+		ret
+	}
+}
+
+val completeIncorrectGenerate : BoardGenerator = {s ->
+	mehSolve(s)
+
+	var guess = s.getRandomGuess()
+	while (guess != null) {
+		s.update(guess)
+		mehSolve(s)
+		guess = s.getRandomGuess()
+	}
+
+	for (cc in s.cellChannels) {
+		if (s.board[cc.x, cc.y] == 0) {
+			s.update(cc.x, cc.y, cc.options.indices.random() + 1)
+		}
+	}
+	getBoardHints(s)
 }

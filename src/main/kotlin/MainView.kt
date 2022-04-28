@@ -35,9 +35,7 @@ object MainView : EnigView() {
 	var numberBuffer = ""
 	var quickEnter = false
 
-	var board = Board()
-
-	var solver = ChannelSolver(board)
+	var solver = ChannelSolver(Board())
 
 	var buttons = ArrayList<Button>()
 
@@ -55,10 +53,9 @@ object MainView : EnigView() {
 	}
 
 	fun makeButtons() {
-		addButton("Set [N]", GLFW_KEY_N) {
+		addButton("Set [N]", GLFW_KEY_N, false) {
 			val n = numberBuffer.toIntOrNull() ?: return@addButton
 			solver = ChannelSolver(Board(n))
-			board = solver.board
 		}
 
 		addButton("Channel [S]olve", GLFW_KEY_S) {solver.solve()}
@@ -69,7 +66,7 @@ object MainView : EnigView() {
 		//addButton("Get State [C]", GLFW_KEY_C) {solver.printSolvingState()}
 		addButton( "[R]eset Board", GLFW_KEY_R) {solver.reset()}
 
-		addButton( "Save Board [P]", GLFW_KEY_P) {SaveManager.saveBoard(board)}
+		addButton( "Save Board [P]", GLFW_KEY_P) {SaveManager.saveBoard(solver.board)}
 		addButton( "[L]oad Board", GLFW_KEY_L) {
 			val targetSave = numberBuffer.toIntOrNull()
 			val b = if (targetSave != null && targetSave < SaveManager.savedLevelCount - 1) {
@@ -82,7 +79,6 @@ object MainView : EnigView() {
 			} else {
 				solver = ChannelSolver(Board(b.n))
 				solver.import(b)
-				board = solver.board
 			}
 		}
 
@@ -98,7 +94,7 @@ object MainView : EnigView() {
 			}
 		}
 		addButton("[T]ry Generation", GLFW_KEY_T) {
-			makeBoard(solver, steadyGenerate)
+			makeBoard(solver, completeIncorrectGenerate, false)
 		}
 
 		/*addButton("Confirm Impossible [O]", GLFW_KEY_O) {
@@ -109,8 +105,8 @@ object MainView : EnigView() {
 
 	}
 
-	fun addButton(name : String, key : Int, action : () -> Unit) {
-		buttons.add(Button(name, key, action))
+	fun addButton(name : String, key : Int, spawnThread : Boolean = true, action : () -> Unit) {
+		buttons.add(Button(name, key, spawnThread, action))
 	}
 
 	override fun loop(frameBirth : Long, dtime : Float) : Boolean {
@@ -186,21 +182,21 @@ object MainView : EnigView() {
 
 		if (input.keys[GLFW_KEY_ENTER] == KeyState.Released) {
 			var num = numberBuffer.toIntOrNull() ?: -1
-			if (num !in 0..board.dim) num = -1
+			if (num !in 0..solver.board.dim) num = -1
 			if (num != -1) {
 				if (num == 0) {
-					board[selectedX, selectedY] = 0
+					solver.board[selectedX, selectedY] = 0
 				} else {
 					solver.update(selectedX, selectedY, num)
 				}
 			}
 			if (input.keys[GLFW_KEY_RIGHT_SHIFT].isDown || quickEnter) {
 				++selectedX
-				if (selectedX >= board.dim) {
+				if (selectedX >= solver.board.dim) {
 					selectedX = 0
 					++selectedY
 				}
-				if (selectedY >= board.dim) {
+				if (selectedY >= solver.board.dim) {
 					selectedY = 0
 				}
 				numberBuffer = ""
@@ -224,8 +220,8 @@ object MainView : EnigView() {
 
 		if (input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT] == KeyState.Released) {
 			if (input.glCursorX < 1f / 3f) {
-				selectedX = floor(board.dim * 3f * (input.glCursorX + 1f) / 4f).toInt()
-				selectedY = floor(board.dim * (input.glCursorY + 1f) / 2f).toInt()
+				selectedX = floor(solver.board.dim * 3f * (input.glCursorX + 1f) / 4f).toInt()
+				selectedY = floor(solver.board.dim * (input.glCursorY + 1f) / 2f).toInt()
 			}
 		}
 
@@ -247,18 +243,18 @@ object MainView : EnigView() {
 
 		if (selectedX >= 0 || selectedY >= 0) {
 			if (selectedX < 0) {
-				selectedX = board.dim - 1
+				selectedX = solver.board.dim - 1
 				--selectedY
 			}
-			if (selectedX >= board.dim) {
+			if (selectedX >= solver.board.dim) {
 				selectedX = 0
 				++selectedY
 			}
 			if (selectedY < 0) {
-				selectedY += board.dim
+				selectedY += solver.board.dim
 			}
-			if (selectedY >= board.dim) {
-				selectedY -= board.dim
+			if (selectedY >= solver.board.dim) {
+				selectedY -= solver.board.dim
 			}
 		}
 	}
@@ -281,19 +277,20 @@ object MainView : EnigView() {
 
 		val selectedNum = numberBuffer.toIntOrNull()
 
-		for (x in 0 until board.dim) for (y in 0 until board.dim) {
+		for (x in 0 until solver.board.dim) for (y in 0 until solver.board.dim) {
 			cshader[0, 0] = cam.getMatrix()
-				.translate(-1f + 2f * x / board.dim, 1 - 2f * (y + 1) / board.dim, 0f)
-				.scale(1.8f / (board.dim))
+				.translate(-1f + 2f * x / solver.board.dim, 1 - 2f * (y + 1) / solver.board.dim, 0f)
+				.scale(1.8f / (solver.board.dim))
 				.translate(0.05f, 0.05f, 0f)
 
-			val color = if ((x / board.n) % 2 +  y / board.n % 2 == 1) {
+			val color = if ((x / solver.board.n) % 2 +  y / solver.board.n % 2 == 1) {
 				Vector3f(0.2f, 0.2f, 0.2f)
 			} else {
 				Vector3f(0.4f, 0.4f, 0.4f)
 			}
-			if (selectedNum != null && selectedNum in 1..board.dim) {
-				if (board[x, y] == selectedNum) {
+
+			if (selectedNum != null && selectedNum in 1..solver.board.dim) {
+				if (solver.board[x, y] == selectedNum) {
 					color.y += 0.2f
 				} else if (solver.cellChannelFor(x, y).options[selectedNum - 1]) {
 					color.x += 0.15f
@@ -306,13 +303,13 @@ object MainView : EnigView() {
 	}
 
 	fun drawPossibilities() {
-		for (x in 0 until board.dim) for (y in 0 until board.dim) {
-			for (lx in 0 until board.n) for (ly in 0 until board.n) {
-				if (solver.cellChannels[x + board.dim * y].options[lx + board.n * ly]) {
+		for (x in 0 until solver.board.dim) for (y in 0 until solver.board.dim) {
+			for (lx in 0 until solver.board.n) for (ly in 0 until solver.board.n) {
+				if (solver.cellChannels[x + solver.board.dim * y].options[lx + solver.board.n * ly]) {
 					cshader[0, 0] = cam.getMatrix()
-						.translate(-1f + 2f * x / board.dim, 1 - 2f * (y + 1) / board.dim, 0f)
-						.scale(2f / (board.dim * board.n))
-						.translate(lx.toFloat(), board.n - ly.toFloat() - 1f, 0f)
+						.translate(-1f + 2f * x / solver.board.dim, 1 - 2f * (y + 1) / solver.board.dim, 0f)
+						.scale(2f / (solver.board.dim * solver.board.n))
+						.translate(lx.toFloat(), solver.board.n - ly.toFloat() - 1f, 0f)
 						.scale(0.6f)
 						.translate(0.3f, 0.3f, 0f)
 					cshader[2, 0] = Vector3f(0.3f, 0.3f, 0.3f)
@@ -327,13 +324,13 @@ object MainView : EnigView() {
 
 			if (!solver.cellChannelFor(imp.x, imp.y).options[imp.v - 1]) continue
 
-			val lx = (imp.v - 1) % board.n
-			val ly = (imp.v - 1) / board.n
+			val lx = (imp.v - 1) % solver.board.n
+			val ly = (imp.v - 1) / solver.board.n
 
 			cshader[0, 0] = cam.getMatrix()
-				.translate(-1f + 2f * imp.x / board.dim, 1 - 2f * (imp.y + 1) / board.dim, 0f)
-				.scale(2f / (board.dim * board.n))
-				.translate(lx.toFloat(), board.n - ly.toFloat() - 1f, 0f)
+				.translate(-1f + 2f * imp.x / solver.board.dim, 1 - 2f * (imp.y + 1) / solver.board.dim, 0f)
+				.scale(2f / (solver.board.dim * solver.board.n))
+				.translate(lx.toFloat(), solver.board.n - ly.toFloat() - 1f, 0f)
 				.scale(0.6f)
 				.translate(0.3f, 0.3f, 0f)
 			cshader[2, 0] = Vector3f(0.3f, 0.0f, 0.0f)
@@ -348,8 +345,8 @@ object MainView : EnigView() {
 		if (selectedX >= 0 && selectedY >= 0) {
 
 			cshader[0, 0] = cam.getMatrix()
-				.translate(-1f + 2f * cx / board.dim, 1 - 2f * (cy + 1) / board.dim, 0f)
-				.scale(1.8f / board.dim)
+				.translate(-1f + 2f * cx / solver.board.dim, 1 - 2f * (cy + 1) / solver.board.dim, 0f)
+				.scale(1.8f / solver.board.dim)
 				.translate(0.05f, 0.05f, 0f)
 			cshader[2, 0] = Vector3f(0.1f, 0.1f, 0.1f)
 			vao.drawTriangles()
@@ -362,15 +359,15 @@ object MainView : EnigView() {
 		font.bind()
 
 		shader[2, 0] = Vector3f(0.9f, 0.9f, 0.9f)
-		for (ri in 1..board.dim) {
-			for (ci in 1..board.dim) {
-				drawTextForCell(ri, ci, board[ci - 1, ri - 1])
+		for (ri in 1..solver.board.dim) {
+			for (ci in 1..solver.board.dim) {
+				drawTextForCell(ri, ci, solver.board[ci - 1, ri - 1])
 			}
 		}
 	}
 
 	fun drawTextForCell(ri : Int, ci : Int, n : Int) {
-		if (n in 1..board.dim) {
+		if (n in 1..solver.board.dim) {
 			val s = "$n"
 			val xad = s.sumOf {c ->
 				val cd = font.charData[c.code]
@@ -379,11 +376,11 @@ object MainView : EnigView() {
 			font.getMats(
 				s, cam.getMatrix()
 					.translate(
-						-1f + 2f * (ci - 0.5f) / (board.dim),
-						1f - 2f * (ri - 0.5f) / (board.dim),
+						-1f + 2f * (ci - 0.5f) / (solver.board.dim),
+						1f - 2f * (ri - 0.5f) / (solver.board.dim),
 						0f
 					)
-					.scale(2f / board.dim)
+					.scale(2f / solver.board.dim)
 					.translate(-xad / 2f, -0.25f, 0f)
 			) { w, tc ->
 				for (i in w.indices) {
